@@ -69,21 +69,6 @@ class MainActivity : AppCompatActivity() {
         btnFoto = findViewById(R.id.btnFoto)
         btnVerLista = findViewById(R.id.btnVerLista)
 
-        //! evaluar si el dni ya existe en tiempo real
-        //! y si es así, mostrar un mensaje de error
-        edtDNI.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                val dni = edtDNI.text.toString()
-                if (dni.isNotEmpty()) {
-                    val dao = supervisorDAO(this)
-                    if (dao.existeDni(dni)) {
-                        Toast.makeText(this, "El DNI ya existe", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this, "DNI disponible", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
 
 
         //! Llamada al método para configurar el botón Guardar
@@ -206,8 +191,6 @@ class MainActivity : AppCompatActivity() {
 
     //! Método para guardar o editar un docente
     private fun funcionGuardarDocente() {
-        // recupera recibe los datos del intent de clase detalle_supervisor.kt
-        // por el botón editar
         val modoEditar = intent.getBooleanExtra("editarSupervisor", false)
         val idSupervisor = intent.getIntExtra("IDsuper", -1)
 
@@ -226,80 +209,81 @@ class MainActivity : AppCompatActivity() {
                     "Noche" -> rdHorario.check(R.id.rdNoche)
                 }
                 nombreFotoActual = supervisor.imagenE
-
-                Toast.makeText(this, "Editando docente: ${supervisor.imagenE} y ${supervisor.nombreE}", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Docente no encontrado", Toast.LENGTH_SHORT).show()
             }
         }
 
-
-        // verifica si el DNI ya existe al perder el foco
+        // Validación de DNI al perder foco
         edtDNI.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
-                val dni = edtDNI.text.toString()
-                if (dni.isNotEmpty()) {
+                val dniIngresado = edtDNI.text.toString()
+                if (dniIngresado.isNotEmpty()) {
                     val dao = supervisorDAO(this)
+                    val dniExiste = dao.existeDni(dniIngresado)
 
-                    // condición para verificar si el DNI ya existe
-                    if (dao.existeDni(dni)) {
+                    val dniOriginal = if (modoEditar) {
+                        dao.obtenerSupervisorPorId(idSupervisor)?.dniE
+                    } else null
+
+                    if (dniExiste && dniIngresado != dniOriginal) {
                         Toast.makeText(this, "El DNI ya existe", Toast.LENGTH_SHORT).show()
+                        btnGuardar.isEnabled = false
                     } else {
-                        // Si el DNI no existe, permite continuar
-                        btnGuardar.setOnClickListener {
-                            val nombre = edtNombre.text.toString()
-                            val apellido = edtApellido.text.toString()
-                            val dni = edtDNI.text.toString()
-                            val sueldo = edtSueldo.text.toString().toDoubleOrNull() ?: 0.0
-                            val turno = when (rdHorario.checkedRadioButtonId) {
-                                R.id.rdMañana -> "Mañana"
-                                R.id.rdTarde -> "Tarde"
-                                R.id.rdNoche -> "Noche"
-                                else -> ""
-                            }
-
-                            val foto = if (nombreFotoActual.isNotEmpty()) nombreFotoActual else "imagen_default.jpg"
-
-                            if (
-                                nombre.isNotEmpty() &&
-                                apellido.isNotEmpty() &&
-                                dni.isNotEmpty() &&
-                                edtSueldo.text.toString().isNotEmpty() &&
-                                turno.isNotEmpty() &&
-                                nombreFotoActual.isNotEmpty()
-                            ) {
-                                mostrarDialogoConfirmacion(modoEditar) {
-                                    val supervisor = Supervisores(
-                                        idE = if (modoEditar) idSupervisor else 0,
-                                        nombreE = nombre,
-                                        apellidoE = apellido,
-                                        sueldoE = sueldo,
-                                        dniE = dni,
-                                        turnoE = turno,
-                                        imagenE = foto
-                                    )
-
-                                    val dao = supervisorDAO(this)
-                                    val resultado = if (modoEditar) dao.editarSupervisorPorId(supervisor) else dao.insertarSupervisor(supervisor)
-
-                                    if (resultado) {
-                                        val mensaje = if (modoEditar) "Datos actualizados correctamente" else "Datos guardados correctamente"
-                                        Toast.makeText(this, mensaje, Toast.LENGTH_SHORT).show()
-                                        if (!modoEditar) limpiarCampos()
-
-                                        val intent = Intent(this, lista_supervisores::class.java)
-                                        startActivity(intent)
-                                        finish()
-                                    } else {
-                                        Toast.makeText(this, "Error al guardar los datos", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            } else {
-                                Toast.makeText(this, "Por favor, completa todos los campos y toma una foto", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                        btnGuardar.isEnabled = true
                     }
                 }
+            }
+        }
+
+        btnGuardar.setOnClickListener {
+            val nombre = edtNombre.text.toString()
+            val apellido = edtApellido.text.toString()
+            val dni = edtDNI.text.toString()
+            val sueldo = edtSueldo.text.toString().toDoubleOrNull() ?: 0.0
+            val turno = when (rdHorario.checkedRadioButtonId) {
+                R.id.rdMañana -> "Mañana"
+                R.id.rdTarde -> "Tarde"
+                R.id.rdNoche -> "Noche"
+                else -> ""
+            }
+
+            val foto = if (nombreFotoActual.isNotEmpty()) nombreFotoActual else "imagen_default.jpg"
+
+            if (
+                nombre.isNotEmpty() &&
+                apellido.isNotEmpty() &&
+                dni.isNotEmpty() &&
+                edtSueldo.text.toString().isNotEmpty() &&
+                turno.isNotEmpty() &&
+                nombreFotoActual.isNotEmpty()
+            ) {
+                mostrarDialogoConfirmacion(modoEditar) {
+                    val supervisor = Supervisores(
+                        idE = if (modoEditar) idSupervisor else 0,
+                        nombreE = nombre,
+                        apellidoE = apellido,
+                        sueldoE = sueldo,
+                        dniE = dni,
+                        turnoE = turno,
+                        imagenE = foto
+                    )
+
+                    val dao = supervisorDAO(this)
+                    val resultado = if (modoEditar) dao.editarSupervisorPorId(supervisor) else dao.insertarSupervisor(supervisor)
+
+                    if (resultado) {
+                        val mensaje = if (modoEditar) "Datos actualizados correctamente" else "Datos guardados correctamente"
+                        Toast.makeText(this, mensaje, Toast.LENGTH_SHORT).show()
+                        if (!modoEditar) limpiarCampos()
+
+                        val intent = Intent(this, lista_supervisores::class.java)
+                        startActivity(intent)
+                        finish()
+                    } else {
+                        Toast.makeText(this, "Error al guardar los datos", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                Toast.makeText(this, "Por favor, completa todos los campos y toma una foto", Toast.LENGTH_SHORT).show()
             }
         }
     }
